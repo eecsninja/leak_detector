@@ -107,8 +107,11 @@ LeakDetectorImpl::LeakDetectorImpl(uintptr_t mapping_addr,
 }
 
 LeakDetectorImpl::~LeakDetectorImpl() {
-  for (CallStack* call_stack : call_stacks_)
+  for (CallStack* call_stack : call_stacks_) {
+    CustomAllocator::Free(call_stack->stack,
+                          call_stack->depth * sizeof(*call_stack->stack));
     CustomAllocator::Free(call_stack, sizeof(CallStack));
+  }
   call_stacks_.clear();
 
   // Free any call stack tables.
