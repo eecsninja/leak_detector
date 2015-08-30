@@ -10,11 +10,12 @@
 
 namespace base {
 
-uint32_t SuperFastHash(const char*, size_t);
+// Perform a full hash.
+uint32_t Hash(const void*, size_t);
 
-inline uint32_t Hash(const char* data, size_t len) {
-  return SuperFastHash(data, len);
-}
+// Perform a hash in stages.
+uint32_t HashStep(uint32_t, const void*, size_t);
+uint32_t HashFinish(uint32_t);
 
 }  // namespace base
 

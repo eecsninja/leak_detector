@@ -1,7 +1,22 @@
 #include "base/hash.h"
 
-#include <stdint.h>
-#include <stdlib.h>
+#include <stdio.h>
+
+#include <algorithm>
+#include <string>
+
+#include "gtest/gtest.h"
+/*
+#include <assert.h>
+#define EXPECT_EQ(a,b) assert(a==b)
+#define TEST(c,f) void c ## f()
+*/
+namespace {
+
+const std::string kInput = "the quick brown fox jumps over the lazy dog";
+
+}  // namespace
+
 #undef get16bits
 #if (defined(__GNUC__) && defined(__i386__)) || defined(__WATCOMC__) \
   || defined(_MSC_VER) || defined (__BORLANDC__) || defined (__TURBOC__)
@@ -15,9 +30,7 @@
 
 namespace base {
 
-uint32_t Hash(const void *input, size_t len) {
-    const char* data = reinterpret_cast<const char*>(input);
-
+uint32_t Hash(const char *data, size_t len) {
     uint32_t hash = 0, tmp;
     int rem;
 
@@ -63,9 +76,7 @@ uint32_t Hash(const void *input, size_t len) {
     return hash;
 }
 
-uint32_t HashStep(uint32_t hash, const void* input, size_t len) {
-    const char* data = reinterpret_cast<const char*>(input);
-
+uint32_t HashStep(uint32_t hash, const char* data, size_t len) {
     int rem = len & 3;
     len >>= 2;
 
@@ -110,3 +121,32 @@ uint32_t HashFinish(uint32_t hash) {
 }
 
 }  // namespace base
+
+TEST(HashTest, ZeroInput) {
+  EXPECT_EQ(0U, base::Hash(nullptr, 0));
+}
+
+TEST(HashTest, StartFinish) {
+  uint32_t hash = base::HashStep(0, kInput.c_str(), kInput.size());
+  hash = base::HashFinish(hash);
+
+  uint32_t expected = base::Hash(kInput.c_str(), kInput.size());
+  EXPECT_EQ(expected, hash);
+}
+
+TEST(HashTest, Progressive) {
+  size_t len = kInput.size();
+  const char* s = kInput.c_str();
+
+  uint32_t hash = 0;
+  while (len) {
+    int delta = std::min(sizeof(uint32_t), len);
+    hash = base::HashStep(hash, s, delta);
+    s += delta;
+    len -= delta;
+  }
+  hash = base::HashFinish(hash);
+
+  uint32_t expected = base::Hash(kInput.c_str(), kInput.size());
+  EXPECT_EQ(expected, hash);
+}
