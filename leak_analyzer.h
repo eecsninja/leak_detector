@@ -10,6 +10,7 @@
 #include <map>
 #include <vector>
 
+#include "base/macros.h"
 #include "components/metrics/leak_detector/leak_detector_value_type.h"
 #include "components/metrics/leak_detector/ranked_list.h"
 

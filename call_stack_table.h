@@ -11,6 +11,7 @@
 #include <functional>
 #include <unordered_map>
 
+#include "base/macros.h"
 #include "components/metrics/leak_detector/leak_analyzer.h"
 #include "components/metrics/leak_detector/stl_allocator.h"
 

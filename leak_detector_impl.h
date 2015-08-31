@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "base/macros.h"
 #include "components/metrics/leak_detector/call_stack_table.h"
 #include "components/metrics/leak_detector/leak_analyzer.h"
 
