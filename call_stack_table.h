@@ -17,31 +17,14 @@
 
 namespace leak_detector {
 
-// Struct to represent a call stack.
-struct CallStack {
-  uint32_t depth;                        // Depth of current call stack.
-  const void** stack;                    // Call stack as an array of addrs.
-
-  size_t hash;                           // Hash of call stack.
-
-  // Generate hash from call stack.
-  struct ComputeHash {
-    size_t operator() (const CallStack* call_stack) const;
-  };
-};
+struct CallStack;
 
 // Contains a hash table where the key is the call stack and the value is the
 // number of allocations from that call stack.
 class CallStackTable {
  public:
   struct StoredHash {
-    size_t operator() (const CallStack* call_stack) const {
-      // The call stack object should already have a hash computed when it was
-      // created.
-      //
-      // This is NOT the actual hash computation function for a new call stack.
-      return call_stack->hash;
-    }
+    size_t operator() (const CallStack* call_stack) const;
   };
 
   explicit CallStackTable(int call_stack_suspicion_threshold);

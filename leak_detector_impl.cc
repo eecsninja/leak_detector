@@ -6,7 +6,7 @@
 
 #include <inttypes.h>
 #include <stddef.h>
-#include <unistd.h>
+#include <unistd.h>  // for getpid()
 
 #include <algorithm>
 #include <new>
@@ -107,13 +107,6 @@ LeakDetectorImpl::LeakDetectorImpl(uintptr_t mapping_addr,
 }
 
 LeakDetectorImpl::~LeakDetectorImpl() {
-  for (CallStack* call_stack : call_stacks_) {
-    CustomAllocator::Free(call_stack->stack,
-                          call_stack->depth * sizeof(*call_stack->stack));
-    CustomAllocator::Free(call_stack, sizeof(CallStack));
-  }
-  call_stacks_.clear();
-
   // Free any call stack tables.
   for (AllocSizeEntry& entry : size_entries_) {
     CallStackTable* table = entry.stack_table;
@@ -142,7 +135,8 @@ void LeakDetectorImpl::RecordAlloc(
   ++entry->num_allocs;
 
   if (entry->stack_table && stack_depth > 0) {
-    alloc_info.call_stack = GetCallStack(stack_depth, stack);
+    alloc_info.call_stack =
+        call_stack_manager_.GetCallStack(stack_depth, stack);
     entry->stack_table->Add(alloc_info.call_stack);
 
     ++num_allocs_with_call_stack_;
@@ -268,33 +262,6 @@ size_t LeakDetectorImpl::AddressHash::operator() (uintptr_t addr) const {
   return base::Hash(reinterpret_cast<const char*>(&addr), sizeof(addr));
 }
 
-CallStack* LeakDetectorImpl::GetCallStack(
-    int depth, const void* const stack[]) {
-  // Temporarily create a call stack object for lookup in |call_stacks_|.
-  CallStack temp;
-  temp.depth = depth;
-  temp.stack = const_cast<const void**>(stack);
-
-  auto iter = call_stacks_.find(&temp);
-  if (iter != call_stacks_.end())
-    return *iter;
-
-  // Since |call_stacks_| stores CallStack pointers rather than actual objects,
-  // create new call objects manually here.
-  CallStack* new_call_stack =
-      new(CustomAllocator::Allocate(sizeof(CallStack))) CallStack;
-  memset(new_call_stack, 0, sizeof(*new_call_stack));
-  new_call_stack->depth = depth;
-  new_call_stack->hash = call_stacks_.hash_function()(&temp);
-  new_call_stack->stack =
-      reinterpret_cast<const void**>(
-          CustomAllocator::Allocate(sizeof(*stack) * depth));
-  std::copy(stack, stack + depth, new_call_stack->stack);
-
-  call_stacks_.insert(new_call_stack);
-  return new_call_stack;
-}
-
 uintptr_t LeakDetectorImpl::GetOffset(const void *ptr) const {
   uintptr_t ptr_value = reinterpret_cast<uintptr_t>(ptr);
   if (ptr_value >= mapping_addr_ && ptr_value < mapping_addr_ + mapping_size_)
@@ -313,7 +280,7 @@ void LeakDetectorImpl::DumpStats() const {
            "Number of call stack buckets: %zu\n",
            alloc_size_, free_size_, alloc_size_ - free_size_, num_stack_tables_,
            num_allocs_ ? 100.0f * num_allocs_with_call_stack_ / num_allocs_ : 0,
-           call_stacks_.bucket_count());
+           call_stack_manager_.size());
   PrintWithPidOnEachLine(buf);
 }
 

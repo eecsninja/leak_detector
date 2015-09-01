@@ -7,13 +7,12 @@
 
 #include <gperftools/custom_allocator.h>
 #include <stdint.h>
-#include <string.h>  // For memset and memcpy.
 
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 #include "base/macros.h"
-#include "components/metrics/leak_detector/call_stack_table.h"
+#include "components/metrics/leak_detector/call_stack_manager.h"
 #include "components/metrics/leak_detector/leak_analyzer.h"
 
 namespace leak_detector {
@@ -22,6 +21,8 @@ namespace leak_detector {
 // CustomAllocator to avoid recursive malloc hook invocation.
 template <typename T>
 using InternalVector = std::vector<T, STL_Allocator<T, CustomAllocator>>;
+
+struct CallStackTable;
 
 struct InternalLeakReport {
   size_t alloc_size_bytes;
@@ -87,27 +88,10 @@ class LeakDetectorImpl {
   using AllocationEntryAllocator =
       STL_Allocator<std::pair<const void*, AllocInfo>, CustomAllocator>;
 
-  // Allocator class for unique call stacks.
-  using TableEntryAllocator = STL_Allocator<const CallStack*, CustomAllocator>;
-
   // Hash class for addresses.
   struct AddressHash {
     size_t operator() (uintptr_t addr) const;
   };
-
-  // Comparator class for call stack objects.
-  struct CallStackCompare {
-    bool operator() (const CallStack* c1, const CallStack* c2) const {
-      return c1->depth == c2->depth &&
-             std::equal(c1->stack, c1->stack + c1->depth, c2->stack);
-    }
-  };
-
-  // Returns a CallStack object for a given call stack. Each unique call stack
-  // has its own CallStack object. If the given call stack has already been
-  // created by a previous call to this function, return a pointer to that same
-  // call stack object.
-  CallStack* GetCallStack(int depth, const void* const stack[]);
 
   // Returns the offset of |ptr| within the current binary. If it is not in the
   // current binary, just return |ptr| as an integer.
@@ -119,10 +103,7 @@ class LeakDetectorImpl {
   // Owns all unique call stack objects, which are allocated on the heap. Any
   // other class or function that references a call stack must get it from here,
   // but may not take ownership of the call stack object.
-  std::unordered_set<CallStack*,
-                     CallStack::ComputeHash,
-                     CallStackCompare,
-                     TableEntryAllocator> call_stacks_;
+  CallStackManager call_stack_manager_;
 
   // Allocation stats.
   uint64_t num_allocs_;

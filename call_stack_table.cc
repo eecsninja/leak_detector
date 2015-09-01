@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "base/hash.h"
+#include "components/metrics/leak_detector/call_stack_manager.h"
 
 namespace leak_detector {
 
@@ -22,9 +22,13 @@ const int kInitialHashTableSize = 1999;
 
 }  // namespace
 
-size_t CallStack::ComputeHash::operator() (const CallStack* call_stack) const {
-  return base::Hash(reinterpret_cast<const char*>(call_stack->stack),
-                    sizeof(*(call_stack->stack)) * call_stack->depth);
+size_t CallStackTable::StoredHash::operator() (
+    const CallStack* call_stack) const {
+  // The call stack object should already have a hash computed when it was
+  // created.
+  //
+  // This is NOT the actual hash computation function for a new call stack.
+  return call_stack->hash;
 }
 
 CallStackTable::CallStackTable(int call_stack_suspicion_threshold)
