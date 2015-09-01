@@ -20,6 +20,9 @@
 
 namespace leak_detector {
 
+uint64_t default_chrome_addr = 0;
+uint64_t default_chrome_size = 0;
+
 namespace {
 
 // We strip out different number of stack frames in debug mode
@@ -209,6 +212,15 @@ void Initialize() {
 
   // Locate the Chrome binary mapping before doing anything else.
   dl_iterate_phdr(IterateLoadedObjects, &chrome_mapping);
+
+  if (default_chrome_addr && default_chrome_size) {
+    chrome_mapping.addr = default_chrome_addr;
+    chrome_mapping.size = default_chrome_size;
+
+    LOG(ERROR) << "Chrome mapped from " << std::hex
+               << chrome_mapping.addr << " to "
+               << chrome_mapping.addr + chrome_mapping.size;
+  }
 
   // This should be done before the hooks are set up, since it should
   // call new, and we want that to be accounted for correctly.

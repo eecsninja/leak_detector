@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "base/logging.h"
 #include "hooks.h"
 #include "leak_detector.h"
 
@@ -25,6 +26,16 @@ struct FreeEntry {
 
 static bool DEBUG = getenv("DEBUG");
 
+namespace leak_detector {
+
+extern uint64_t default_chrome_addr;
+extern uint64_t default_chrome_size;
+
+}  // namespace leak_detector
+
+using leak_detector::default_chrome_addr;
+using leak_detector::default_chrome_size;
+
 int main(int argc, char* argv[]) {
   if (argc < 2) {
     printf("Need to provide an input file:\n");
@@ -32,10 +43,14 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
+  FILE* fp = fopen(argv[1], "rb");
+  CHECK(fp);
+  CHECK(!feof(fp));
+  CHECK_EQ(1, fread(&default_chrome_addr, sizeof(default_chrome_addr), 1, fp));
+  CHECK_EQ(1, fread(&default_chrome_size, sizeof(default_chrome_size), 1, fp));
+
   leak_detector::Initialize();
 
-
-  FILE* fp = fopen(argv[1], "rb");
   while (!feof(fp)) {
     union {
       uint32_t code;
