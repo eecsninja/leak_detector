@@ -5,87 +5,63 @@
 #include "components/metrics/leak_detector/call_stack_manager.h"
 
 #include <gperftools/custom_allocator.h>
-#include <stdint.h>
+#include <string.h>   // For memset.
 
+#include <algorithm>  // For std::copy.
 #include <new>
 
 #include "base/hash.h"
-#include "base/logging.h"
 
 namespace leak_detector {
 
-CallStackManager::CallStackManager() : num_call_stacks_(0) {}
+CallStackManager::CallStackManager() {}
 
 CallStackManager::~CallStackManager() {
-  FreeNode(&call_stack_tree_root_node_);
+  for (CallStack* call_stack : call_stacks_) {
+    CustomAllocator::Free(call_stack->stack,
+                          call_stack->depth * sizeof(*call_stack->stack));
+    CustomAllocator::Free(call_stack, sizeof(CallStack));
+  }
+  call_stacks_.clear();
 }
 
-CallStack* CallStackManager::GetCallStack(
+const CallStack* CallStackManager::GetCallStack(
     int depth, const void* const stack[]) {
-  CallStackNode* node = &call_stack_tree_root_node_;
+  // Temporarily create a call stack object for lookup in |call_stacks_|.
+  CallStack temp;
+  temp.depth = depth;
+  temp.stack = const_cast<const void**>(stack);
 
-  // Iterate through the call stack tree.
-  for (int i = depth - 1; i >= 0; --i) {
-    const void* ptr = stack[i];
+  auto iter = call_stacks_.find(&temp);
+  if (iter != call_stacks_.end())
+    return *iter;
 
-    auto node_iter = node->children.find(ptr);
-    if (node_iter != node->children.end()) {
-      // Found existing node, proceed.
-      node = node_iter->second;
-      continue;
-    }
-
-    // Create and insert new node.
-    CallStackNode* new_node =
-        new(CustomAllocator::Allocate(sizeof(CallStackNode))) CallStackNode();
-    uintptr_t ptr_value = reinterpret_cast<uintptr_t>(ptr);
-    new_node->hash = base::HashStep(node->hash, &ptr_value, sizeof(ptr_value));
-    new_node->call_stack = nullptr;
-    node->children[ptr] = new_node;
-    //node->children.insert(new_node);
-
-    // Continue on...
-    node = new_node;
-  }
-
-  // |node| now points to the node in the call stack tree corresponding to the
-  // end of the current call stack.
-
-  if (node->call_stack)
-    return node->call_stack;
-
-  // Create a new call stack object if there isn't already one.
+  // Since |call_stacks_| stores CallStack pointers rather than actual objects,
+  // create new call objects manually here.
   CallStack* call_stack =
       new(CustomAllocator::Allocate(sizeof(CallStack))) CallStack;
-  ++num_call_stacks_;
-
-  node->call_stack = call_stack;
-
+  memset(call_stack, 0, sizeof(*call_stack));
   call_stack->depth = depth;
-  call_stack->hash = base::HashFinish(node->hash);
-  call_stack->stack = reinterpret_cast<const void**>(
-      CustomAllocator::Allocate(sizeof(*stack) * depth));
+  call_stack->hash = call_stacks_.hash_function()(&temp);
+  call_stack->stack =
+      reinterpret_cast<const void**>(
+          CustomAllocator::Allocate(sizeof(*stack) * depth));
   std::copy(stack, stack + depth, call_stack->stack);
 
+  call_stacks_.insert(call_stack);
   return call_stack;
 }
 
-// static
-void CallStackManager::FreeNode(CallStackManager::CallStackNode* node) {
-  if (node->call_stack) {
-    CallStack* call_stack = node->call_stack;
-    CustomAllocator::Free(call_stack->stack,
-                          sizeof(*call_stack->stack) * call_stack->depth);
-    CustomAllocator::Free(call_stack, sizeof(*call_stack));
-    node->call_stack = nullptr;
-  }
+size_t CallStackManager::CallStackPointerHash::operator() (
+    const CallStack* call_stack) const {
+  return base::Hash(reinterpret_cast<const char*>(call_stack->stack),
+                    sizeof(*(call_stack->stack)) * call_stack->depth);
+}
 
-  for (auto child_pair : node->children) {
-    CallStackNode* child_node = child_pair.second;
-    FreeNode(child_node);
-    CustomAllocator::Free(child_node, sizeof(*child_node));
-  }
-  node->children.clear();
+bool CallStackManager::CallStackPointerEqual::operator() (
+    const CallStack* c1, const CallStack* c2) const {
+  return c1->depth == c2->depth &&
+         std::equal(c1->stack, c1->stack + c1->depth, c2->stack);
 }
 
 }  // namespace leak_detector

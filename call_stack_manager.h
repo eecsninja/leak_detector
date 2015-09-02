@@ -8,7 +8,7 @@
 #include <gperftools/custom_allocator.h>
 #include <stdint.h>
 
-#include <map>
+#include <unordered_set>
 
 #include "base/macros.h"
 #include "components/metrics/leak_detector/stl_allocator.h"
@@ -23,8 +23,7 @@ struct CallStack {
   size_t hash;                           // Hash of call stack.
 };
 
-// Contains a hash table where the key is the call stack and the value is the
-// number of allocations from that call stack.
+// Maintains and owns all unique call stack objects.
 class CallStackManager {
  public:
   CallStackManager();
@@ -34,33 +33,36 @@ class CallStackManager {
   // has its own CallStack object. If the given call stack has already been
   // created by a previous call to this function, return a pointer to that same
   // call stack object.
-  CallStack* GetCallStack(int depth, const void* const stack[]);
+  //
+  // Returns the call stacks as const pointers because no caller should take
+  // ownership of them and modify or delete them.
+  const CallStack* GetCallStack(int depth, const void* const stack[]);
 
   size_t size() const {
-    return num_call_stacks_;
+    return call_stacks_.size();
   }
 
  private:
-  struct CallStackNode {
-    uint32_t hash;
-    CallStack* call_stack;
-    // TODO(sque): Consider unordered_map.
-    std::map<const void*,
-             CallStackNode*,
-             std::less<const void*>,
-             STL_Allocator<std::pair<const void*, CallStackNode*>,
-                           CustomAllocator>> children;
+  // Allocator class for unique call stacks.
+  using CallStackPointerAllocator = STL_Allocator<CallStack*, CustomAllocator>;
 
-    CallStackNode() : hash(0), call_stack(nullptr) {}
+  // Used to compute hashes from call stack objects. Takes a pointer to a call
+  // stack object as an argument.
+  struct CallStackPointerHash {
+    size_t operator() (const CallStack* call_stack) const;
   };
 
-  // Recursively frees all dynamically allocated memory within |node|. Does not
-  // free |node| itself.
-  static void FreeNode(CallStackManager::CallStackNode* node);
+  // Equality comparator for call stack objects. Takes pointers to call stack
+  // objects as arguments.
+  struct CallStackPointerEqual {
+    bool operator() (const CallStack* c1, const CallStack* c2) const;
+  };
 
-  CallStackNode call_stack_tree_root_node_;
-
-  size_t num_call_stacks_;
+  // Holds all call stack objects.
+  std::unordered_set<CallStack*,
+                     CallStackPointerHash,
+                     CallStackPointerEqual,
+                     CallStackPointerAllocator> call_stacks_;
 
   DISALLOW_COPY_AND_ASSIGN(CallStackManager);
 };
