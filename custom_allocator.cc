@@ -6,9 +6,13 @@
 
 #include "base/low_level_alloc.h"
 
-static LowLevelAlloc::Arena* g_arena = nullptr;
+namespace {
+
+LowLevelAlloc::Arena* g_arena = nullptr;
 
 bool g_is_initalized_for_unit_test = false;
+
+}  // namespace
 
 // static
 void CustomAllocator::Initialize() {
