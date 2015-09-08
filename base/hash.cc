@@ -21,7 +21,7 @@ uint32_t Hash(const void *input, size_t len) {
     uint32_t hash = 0, tmp;
     int rem;
 
-    if (len <= 0 || data == NULL)
+    if (len <= 0 || data == nullptr)
         return hash;
 
     rem = len & 3;

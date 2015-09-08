@@ -46,13 +46,13 @@ struct MappingInfo {
 bool EnvToBool(const char* envname, const bool default_value) {
   return !getenv(envname)
       ? default_value
-      : memchr("tTyY1\0", getenv(envname)[0], 6) != NULL;
+      : memchr("tTyY1\0", getenv(envname)[0], 6) != nullptr;
 }
 
 int EnvToInt(const char* envname, const int default_value) {
   return !getenv(envname)
       ? default_value
-      : strtol(getenv(envname), NULL, 10);
+      : strtol(getenv(envname), nullptr, 10);
 }
 
 // Used for sampling allocs and frees. Randomly samples |g_sampling_factor|/256
