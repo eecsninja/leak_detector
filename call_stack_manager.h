@@ -46,21 +46,25 @@ class CallStackManager {
   // Allocator class for unique call stacks.
   using CallStackPointerAllocator = STL_Allocator<CallStack*, CustomAllocator>;
 
-  // Used to compute hashes from call stack objects. Takes a pointer to a call
-  // stack object as an argument.
-  struct CallStackPointerHash {
-    size_t operator() (const CallStack* call_stack) const;
+  // Hash operator for call stack object given as a pointer.
+  // Does not actually compute the hash. Instead, returns the already computed
+  // hash value stored in a CallStack object.
+  struct CallStackPointerStoredHash {
+    size_t operator() (const CallStack* call_stack) const {
+      return call_stack->hash;
+    }
   };
 
-  // Equality comparator for call stack objects. Takes pointers to call stack
-  // objects as arguments.
+  // Equality comparator for call stack objects given as pointers. Compares
+  // their stack trace contents.
   struct CallStackPointerEqual {
     bool operator() (const CallStack* c1, const CallStack* c2) const;
   };
 
-  // Holds all call stack objects.
+  // Holds all call stack objects. Each object is allocated elsewhere and stored
+  // as a pointer because the container may rearrange itself internally.
   std::unordered_set<CallStack*,
-                     CallStackPointerHash,
+                     CallStackPointerStoredHash,
                      CallStackPointerEqual,
                      CallStackPointerAllocator> call_stacks_;
 

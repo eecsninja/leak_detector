@@ -31,6 +31,10 @@ const CallStack* CallStackManager::GetCallStack(
   CallStack temp;
   temp.depth = depth;
   temp.stack = const_cast<const void**>(stack);
+  // This is the only place where the call stack's hash is computed. This value
+  // can be reused in the created object to avoid further hash computation.
+  temp.hash =
+      base::Hash(reinterpret_cast<const char*>(stack), sizeof(*stack) * depth);
 
   auto iter = call_stacks_.find(&temp);
   if (iter != call_stacks_.end())
@@ -42,7 +46,7 @@ const CallStack* CallStackManager::GetCallStack(
       new(CustomAllocator::Allocate(sizeof(CallStack))) CallStack;
   memset(call_stack, 0, sizeof(*call_stack));
   call_stack->depth = depth;
-  call_stack->hash = call_stacks_.hash_function()(&temp);
+  call_stack->hash = temp.hash;  // Don't run the hash function again.
   call_stack->stack =
       reinterpret_cast<const void**>(
           CustomAllocator::Allocate(sizeof(*stack) * depth));
@@ -50,12 +54,6 @@ const CallStack* CallStackManager::GetCallStack(
 
   call_stacks_.insert(call_stack);
   return call_stack;
-}
-
-size_t CallStackManager::CallStackPointerHash::operator() (
-    const CallStack* call_stack) const {
-  return base::Hash(reinterpret_cast<const char*>(call_stack->stack),
-                    sizeof(*(call_stack->stack)) * call_stack->depth);
 }
 
 bool CallStackManager::CallStackPointerEqual::operator() (
