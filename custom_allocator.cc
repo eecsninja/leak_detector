@@ -32,6 +32,7 @@ bool CustomAllocator::IsInitialized() {
   return g_arena || g_is_initalized_for_unit_test;
 }
 
+// static
 void CustomAllocator::InitializeForUnitTest() {
   g_is_initalized_for_unit_test = true;
 }
