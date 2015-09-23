@@ -32,6 +32,10 @@ class STL_Allocator : public std::allocator<T> {
   typedef size_t     size_type;
   typedef T*         pointer;
 
+  template <class T1> struct rebind {
+    typedef STL_Allocator<T1, Alloc> other;
+  };
+
   STL_Allocator() {}
   explicit STL_Allocator(const STL_Allocator&) {}
   template <class T1> STL_Allocator(const STL_Allocator<T1, Alloc>&) {}
